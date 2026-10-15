@@ -409,6 +409,26 @@ class WelcomeController extends Controller
         $serverTime = Carbon::now()->format('M d, Y H:i:s');
         $timezone = config('app.timezone');
 
+        // Banner must follow the same staleness as the cards. The SQL flag stays
+        // true forever when last_checked_at was never saved (not mass-assignable).
+        $nullLastChecked = $applications->filter(fn ($app) => $app->last_checked_at === null)->count();
+        $hasStaleData = $applicationStatuses->contains(fn ($row) => (bool) ($row['is_stale'] ?? false));
+
+        // #region agent log
+        @file_put_contents(base_path('debug-9d2885.log'), json_encode([
+            'sessionId' => '9d2885',
+            'hypothesisId' => 'A',
+            'location' => 'WelcomeController.php:apiStatus',
+            'message' => 'stale flag vs saved last_checked_at',
+            'data' => [
+                'hasStaleData' => $hasStaleData,
+                'nullLastChecked' => $nullLastChecked,
+                'activeApps' => $applications->count(),
+            ],
+            'timestamp' => (int) round(microtime(true) * 1000),
+        ])."\n", FILE_APPEND);
+        // #endregion
+
         return response()->json([
             'success' => true,
             'timestamp' => now()->toIso8601String(),

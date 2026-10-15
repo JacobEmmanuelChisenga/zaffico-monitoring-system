@@ -12,7 +12,8 @@ class Applications extends Model
 
     protected $fillable = [
         'name', 'ip_address', 'port', 'protocol', 'endpoint', 'description',
-        'check_interval', 'timeout', 'status', 'response_time', 'is_active', 'created_by'
+        'check_interval', 'timeout', 'status', 'response_time', 'is_active', 'created_by',
+        'last_checked_at',
     ];
 
     protected $casts = [
