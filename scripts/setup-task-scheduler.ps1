@@ -1,22 +1,31 @@
-$projectPath = 'C:\Users\chisengaj\Desktop\LaravelProjects\zaffico-monitoring-system'
+# Prefer the server path; fall back to this PC's Desktop copy.
+$projectPath = 'C:\Users\Administrator\Documents\zaffico-monitoring-system'
+if (-not (Test-Path (Join-Path $projectPath 'artisan'))) {
+    $projectPath = 'C:\Users\chisengaj\Desktop\LaravelProjects\zaffico-monitoring-system'
+}
 $phpCli = 'C:\xampp\php\php.exe'
 $taskName = 'Zaffico-Monitoring-Scheduler'
 $taskDescription = 'Runs Laravel monitoring checks every minute'
 
-# Trigger: every 1 minute (FOREVER)
+if (-not (Test-Path (Join-Path $projectPath 'artisan'))) {
+    throw "artisan not found under $projectPath"
+}
+if (-not (Test-Path $phpCli)) {
+    throw "php.exe not found at $phpCli"
+}
+
+# Trigger: every 1 minute for a long period (Task Scheduler has no true "forever" on -Once)
 $trigger = New-ScheduledTaskTrigger `
     -Once `
     -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes 1) `
-    -RepetitionDuration (New-TimeSpan -Days 365)
+    -RepetitionDuration (New-TimeSpan -Days 3650)
 
-# Action
 $action = New-ScheduledTaskAction `
     -Execute $phpCli `
     -Argument 'artisan monitoring:run-checks --no-interaction' `
     -WorkingDirectory $projectPath
 
-# Settings: Increased execution time limit, allow restart on failure
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
@@ -35,8 +44,9 @@ Register-ScheduledTask `
     -RunLevel Highest `
     -Force
 
-# Start immediately
 Start-ScheduledTask -TaskName $taskName
 
-Write-Host "✅ Task created and started: $taskName"
-Get-ScheduledTask -TaskName $taskName
+Write-Host "Task created and started: $taskName"
+Write-Host "Project path: $projectPath"
+Get-ScheduledTask -TaskName $taskName | Format-List TaskName, State
+Get-ScheduledTaskInfo -TaskName $taskName | Format-List LastRunTime, LastTaskResult, NextRunTime

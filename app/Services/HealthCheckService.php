@@ -49,8 +49,13 @@ class HealthCheckService
         $url = $this->buildUrl($application, $protocol);
 
         try {
-            $httpClient = Http::timeout($application->timeout ?? 10)
-                ->connectTimeout($application->timeout ?? 10);
+            // Cap connect wait so one unreachable host cannot stall the whole cycle.
+            // PAYROLL/SAGE were set to ~21s and made every run take ~44s.
+            $timeout = max(1, (int) ($application->timeout ?? 10));
+            $connectTimeout = min($timeout, 5);
+
+            $httpClient = Http::timeout($timeout)
+                ->connectTimeout($connectTimeout);
             
             // Disable SSL verification for HTTPS connections (needed for internal IPs with self-signed certificates)
             if ($protocol === 'https') {
@@ -157,7 +162,7 @@ class HealthCheckService
         $startTime = microtime(true);
         $host = $application->ip_address;
         $port = $application->port ?? 80;
-        $timeout = $application->timeout ?? 10;
+        $timeout = min(max(1, (int) ($application->timeout ?? 10)), 5);
 
         try {
             $socket = @fsockopen($host, $port, $errno, $errstr, $timeout);
