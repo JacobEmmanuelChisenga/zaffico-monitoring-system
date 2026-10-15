@@ -8,6 +8,7 @@ use App\Models\MonitoringCheck;
 use App\Jobs\ExecuteMonitoringChecks;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 
@@ -138,7 +139,7 @@ class WelcomeController extends Controller
     /**
      * Calculate uptime trend data for the past 7 days
      */
-    private function getUptimeTrendData($applications)
+    private function getUptimeTrendData(Collection $applications)
     {
         $days = collect();
         $appTrends = [];
@@ -356,7 +357,7 @@ class WelcomeController extends Controller
             $lastChecked = $app->last_checked_at;
             if (!$lastChecked) {
                 // Fallback: Get the most recent monitoring check
-                $recentCheck = \App\Models\MonitoringCheck::where('application_id', $app->id)
+                $recentCheck = MonitoringCheck::where('application_id', $app->id)
                     ->orderBy('checked_at', 'desc')
                     ->first();
                 if ($recentCheck && $recentCheck->checked_at) {
@@ -452,12 +453,12 @@ class WelcomeController extends Controller
                 ]);
 
                 // Update incidents
-                $activeIncident = \App\Models\DowntimeIncident::where('application_id', $application->id)
+                $activeIncident = DowntimeIncident::where('application_id', $application->id)
                     ->whereNull('resolved_at')
                     ->first();
 
                 if ($check->status === 'down' && !$activeIncident) {
-                    \App\Models\DowntimeIncident::create([
+                    DowntimeIncident::create([
                         'application_id' => $application->id,
                         'started_at' => now(),
                         'severity' => 'high',
@@ -474,7 +475,7 @@ class WelcomeController extends Controller
                 // Evaluate alert rules
                 $alertRuleService->evaluateRules($application, $check);
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error("Immediate check failed for {$application->name}: {$e->getMessage()}");
+                Log::error("Immediate check failed for {$application->name}: {$e->getMessage()}");
             }
         }
     }
