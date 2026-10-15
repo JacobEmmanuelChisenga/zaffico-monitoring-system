@@ -481,22 +481,20 @@
                     }
                 }
 
-                // Chrome-specific: Also try a quick fetch test to detect network issues
-                // navigator.onLine can be wrong in Chrome, so we test with a fetch
+                // Light reachability check only. Do not hit /api/status every few seconds —
+                // that saturates the single-threaded PHP-CGI workers and causes nginx 502s.
                 if (isOnline) {
-                    // Try a HEAD request to detect if we can actually reach the server
-                    fetch('{{ route('api.status') }}?_test=' + Date.now(), {
+                    fetch('{{ url('/') }}', {
                         method: 'HEAD',
                         cache: 'no-store',
-                        signal: AbortSignal.timeout(3000) // 3 second timeout for quick test
+                        signal: AbortSignal.timeout(3000)
                     }).catch(() => {
-                        // If HEAD request fails, network is actually down despite navigator.onLine
                         console.warn('Network test failed - marking all apps as down');
                         markAllAppsAsDown();
                         showNetworkErrorWarning();
                     });
                 }
-            }, 3000); // Check every 3 seconds (more frequent for Chrome)
+            }, 15000); // Every 15 seconds is enough for online/offline detection
 
             // Initial network check
             window.lastOnlineStatus = navigator.onLine;
@@ -812,75 +810,58 @@
          * Start real-time updates via AJAX polling
          */
         let chartUpdateCounter = 0;
-        const CHART_UPDATE_INTERVAL = 1; // Update chart every poll (10 seconds) for real-time updates
-        let lastDownCount = 0; // Track if apps went down to update chart immediately
-        let lastActiveIncidents = 0; // Track active incidents to force chart updates
+        // Charts are heavy — refresh them every 3rd poll, not every time
+        const CHART_UPDATE_INTERVAL = 3;
+        let lastDownCount = 0;
+        let lastActiveIncidents = 0;
 
         function startRealTimeUpdates() {
-            // Poll every 10 seconds (adjust as needed)
-            const POLL_INTERVAL = 10000; // 10 seconds
-            
-            // Track consecutive failures to prevent spam
+            // 30s keeps the dashboard fresh without filling all PHP-CGI workers
+            const POLL_INTERVAL = 30000;
+
             let consecutiveFailures = 0;
             const MAX_FAILURES = 3;
-            
-            // Initial update (with charts on first load) - force immediate update
-            // This ensures we get fresh data right away, especially after network reconnection
-            fetchStatusUpdate(true).then(() => {
-                // Force another update after 2 seconds to ensure data is fresh
-                setTimeout(() => fetchStatusUpdate(true), 2000);
-            });
-            chartUpdateCounter = 0; // Start at 0 so charts update every poll
 
-            // Set up interval with failure tracking
+            fetchStatusUpdate(true);
+            chartUpdateCounter = 0;
+
             setInterval(function() {
-                // Chrome-specific: Don't rely on navigator.onLine - try to fetch anyway
-                // If fetch fails, we'll detect it as a network error
-                if (consecutiveFailures < MAX_FAILURES) {
-                    // Update chart data every CHART_UPDATE_INTERVAL polls
-                    chartUpdateCounter++;
-                    let includeCharts = (chartUpdateCounter % CHART_UPDATE_INTERVAL === 0);
-
-                    // Always include charts now (every poll) for real-time updates
-                    fetchStatusUpdate(true).then((data) => {
-                        consecutiveFailures = 0; // Reset on success
-
-                        // Check if any apps changed status (went down or came back up)
-                        if (data && data.data && data.data.applicationsDown !== undefined) {
-                            if (data.data.applicationsDown !== lastDownCount) {
-                                // Status changed - log it
-                                lastDownCount = data.data.applicationsDown;
-                                console.log('Status changed: ' + data.data.applicationsDown +
-                                    ' apps down. Charts updated.');
-                            }
-                        }
-
-                        // Track active incidents - force immediate chart update when incidents change
-                        if (data && data.data && data.data.activeIncidents !== undefined) {
-                            if (data.data.activeIncidents !== lastActiveIncidents) {
-                                const oldCount = lastActiveIncidents;
-                                lastActiveIncidents = data.data.activeIncidents;
-
-                                if (data.data.activeIncidents > oldCount) {
-                                    // New incident created - update charts immediately
-                                    console.log('New incident detected: ' + data.data.activeIncidents +
-                                        ' active. Forcing chart update...');
-                                    setTimeout(() => fetchStatusUpdate(true),
-                                        500); // Update again in 500ms to get fresh data
-                                } else if (data.data.activeIncidents < oldCount) {
-                                    // Incident resolved - update charts immediately
-                                    console.log('Incident resolved: ' + data.data.activeIncidents +
-                                        ' active. Charts updated.');
-                                }
-                            }
-                        }
-                    }).catch(() => {
-                        consecutiveFailures++;
-                        if (consecutiveFailures >= MAX_FAILURES) {
-                            console.warn('Too many consecutive failures. Pausing updates.');
-                        }
-                    });
+                if (consecutiveFailures >= MAX_FAILURES) {
+                    return;
                 }
+
+                chartUpdateCounter++;
+                const includeCharts = (chartUpdateCounter % CHART_UPDATE_INTERVAL === 0);
+
+                fetchStatusUpdate(includeCharts).then((data) => {
+                    consecutiveFailures = 0;
+
+                    if (data && data.data && data.data.applicationsDown !== undefined) {
+                        if (data.data.applicationsDown !== lastDownCount) {
+                            lastDownCount = data.data.applicationsDown;
+                            console.log('Status changed: ' + data.data.applicationsDown +
+                                ' apps down. Charts updated.');
+                        }
+                    }
+
+                    if (data && data.data && data.data.activeIncidents !== undefined) {
+                        if (data.data.activeIncidents !== lastActiveIncidents) {
+                            const oldCount = lastActiveIncidents;
+                            lastActiveIncidents = data.data.activeIncidents;
+
+                            if (data.data.activeIncidents !== oldCount) {
+                                console.log('Incidents changed: ' + data.data.activeIncidents +
+                                    ' active. Refreshing charts...');
+                                setTimeout(() => fetchStatusUpdate(true), 2000);
+                            }
+                        }
+                    }
+                }).catch(() => {
+                    consecutiveFailures++;
+                    if (consecutiveFailures >= MAX_FAILURES) {
+                        console.warn('Too many consecutive failures. Pausing updates.');
+                    }
+                });
             }, POLL_INTERVAL);
         }
 
@@ -903,7 +884,7 @@
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
                 controller.abort();
-            }, 8000); // 8 second timeout for faster detection
+            }, 30000); // Allow slow chart/status queries without aborting early
 
             return fetch(url, {
                     method: 'GET',
