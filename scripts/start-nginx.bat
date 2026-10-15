@@ -1,0 +1,58 @@
+@echo off
+REM ============================================
+REM ZAFFICO Monitoring - Nginx Startup Script
+REM ============================================
+REM This script starts Nginx if it's not already running
+REM It properly detaches the process and logs output
+
+setlocal
+
+set "NGINX_HOME=C:\nginx"
+set "NGINX_EXE=%NGINX_HOME%\nginx.exe"
+set "LOG_DIR=%~dp0..\storage\logs"
+set "LOG_FILE=%LOG_DIR%\nginx.log"
+
+REM Create logs directory if it doesn't exist
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+REM Wait for PHP-CGI to initialize (if starting at boot)
+echo [%date% %time%] Waiting 10 seconds for PHP-CGI to initialize... >> "%LOG_FILE%"
+timeout /t 10 /nobreak >nul 2>&1
+
+REM Check if Nginx is already running
+tasklist /FI "IMAGENAME eq nginx.exe" 2>nul | find /I /N "nginx.exe" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [%date% %time%] Nginx is already running, reloading configuration... >> "%LOG_FILE%"
+    "%NGINX_EXE%" -s reload >> "%LOG_FILE%" 2>&1
+    if %errorlevel% equ 0 (
+        echo [%date% %time%] SUCCESS: Nginx configuration reloaded >> "%LOG_FILE%"
+        exit /b 0
+    ) else (
+        echo [%date% %time%] ERROR: Nginx reload failed. Check C:\nginx\logs\error.log >> "%LOG_FILE%"
+        exit /b 1
+    )
+)
+
+REM Check if Nginx executable exists
+if not exist "%NGINX_EXE%" (
+    echo [%date% %time%] ERROR: Nginx executable not found at %NGINX_EXE% >> "%LOG_FILE%"
+    exit /b 1
+)
+
+REM Start Nginx in background
+echo [%date% %time%] Starting Nginx... >> "%LOG_FILE%"
+cd /d "%NGINX_HOME%"
+start "" /B /MIN "%NGINX_EXE%" >> "%LOG_FILE%" 2>&1
+
+REM Wait a moment to check if it started successfully
+timeout /t 3 /nobreak >nul 2>&1
+
+REM Verify Nginx is running
+tasklist /FI "IMAGENAME eq nginx.exe" 2>nul | find /I /N "nginx.exe" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [%date% %time%] SUCCESS: Nginx started successfully >> "%LOG_FILE%"
+    exit /b 0
+) else (
+    echo [%date% %time%] ERROR: Nginx failed to start >> "%LOG_FILE%"
+    exit /b 1
+)
