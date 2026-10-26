@@ -49,10 +49,12 @@ if %errorlevel% equ 0 (
     timeout /t 1 /nobreak >nul 2>&1
 )
 
-REM Start Nginx in background from its own folder
+REM Start Nginx in background from its own folder.
+REM Do not redirect nginx into nginx.log. The editor often has that file open,
+REM and the lock makes nginx exit before it listens on 8888.
 echo [%date% %time%] Starting Nginx... >> "%LOG_FILE%"
 cd /d "%NGINX_HOME%"
-start "" /B /MIN "%NGINX_EXE%" -p "%NGINX_HOME%" >> "%LOG_FILE%" 2>&1
+start "" /B /MIN "%NGINX_EXE%" -p "%NGINX_HOME%"
 
 REM Wait a moment to check if it started successfully
 timeout /t 3 /nobreak >nul 2>&1
