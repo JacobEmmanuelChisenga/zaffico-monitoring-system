@@ -19,11 +19,13 @@ REM Wait for PHP-CGI to initialize (if starting at boot)
 echo [%date% %time%] Waiting 10 seconds for PHP-CGI to initialize... >> "%LOG_FILE%"
 timeout /t 10 /nobreak >nul 2>&1
 
-REM Check if Nginx is already running
-tasklist /FI "IMAGENAME eq nginx.exe" 2>nul | find /I /N "nginx.exe" >nul 2>&1
+REM Reload only when nginx is already listening. Always pass -p so nginx uses
+REM C:\nginx\conf and C:\nginx\logs. Without -p it looks for logs under the
+REM folder you ran the script from and never opens port 8888.
+netstat -ano | findstr "LISTENING" | findstr ":8888 " >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [%date% %time%] Nginx is already running, reloading configuration... >> "%LOG_FILE%"
-    "%NGINX_EXE%" -s reload >> "%LOG_FILE%" 2>&1
+    echo [%date% %time%] Nginx is already listening on 8888, reloading configuration... >> "%LOG_FILE%"
+    "%NGINX_EXE%" -p "%NGINX_HOME%" -s reload >> "%LOG_FILE%" 2>&1
     if %errorlevel% equ 0 (
         echo [%date% %time%] SUCCESS: Nginx configuration reloaded >> "%LOG_FILE%"
         exit /b 0
@@ -39,10 +41,18 @@ if not exist "%NGINX_EXE%" (
     exit /b 1
 )
 
-REM Start Nginx in background
+REM A leftover nginx.exe with the wrong folder must be stopped first.
+tasklist /FI "IMAGENAME eq nginx.exe" 2>nul | find /I /N "nginx.exe" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [%date% %time%] Stopping nginx that is not listening on 8888... >> "%LOG_FILE%"
+    taskkill /F /IM nginx.exe >> "%LOG_FILE%" 2>&1
+    timeout /t 1 /nobreak >nul 2>&1
+)
+
+REM Start Nginx in background from its own folder
 echo [%date% %time%] Starting Nginx... >> "%LOG_FILE%"
 cd /d "%NGINX_HOME%"
-start "" /B /MIN "%NGINX_EXE%" >> "%LOG_FILE%" 2>&1
+start "" /B /MIN "%NGINX_EXE%" -p "%NGINX_HOME%" >> "%LOG_FILE%" 2>&1
 
 REM Wait a moment to check if it started successfully
 timeout /t 3 /nobreak >nul 2>&1
