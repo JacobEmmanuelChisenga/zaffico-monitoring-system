@@ -56,15 +56,19 @@ echo [%date% %time%] Starting Nginx... >> "%LOG_FILE%"
 cd /d "%NGINX_HOME%"
 start "" /B /MIN "%NGINX_EXE%" -p "%NGINX_HOME%"
 
-REM Wait a moment to check if it started successfully
+REM Wait, then confirm port 8888. A running nginx.exe is not enough:
+REM the process can exist while the site port is closed.
 timeout /t 3 /nobreak >nul 2>&1
 
-REM Verify Nginx is running
-tasklist /FI "IMAGENAME eq nginx.exe" 2>nul | find /I /N "nginx.exe" >nul 2>&1
+netstat -ano | findstr "LISTENING" | findstr ":8888 " >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [%date% %time%] SUCCESS: Nginx started successfully >> "%LOG_FILE%"
+    echo [%date% %time%] SUCCESS: Nginx is listening on port 8888 >> "%LOG_FILE%"
     exit /b 0
-) else (
-    echo [%date% %time%] ERROR: Nginx failed to start >> "%LOG_FILE%"
-    exit /b 1
 )
+
+echo [%date% %time%] ERROR: Nginx is not listening on port 8888 >> "%LOG_FILE%"
+echo [%date% %time%] --- C:\nginx\logs\error.log --- >> "%LOG_FILE%"
+if exist "%NGINX_HOME%\logs\error.log" (
+    powershell -NoProfile -Command "Get-Content -Path '%NGINX_HOME%\logs\error.log' -Tail 15" >> "%LOG_FILE%" 2>&1
+)
+exit /b 1
