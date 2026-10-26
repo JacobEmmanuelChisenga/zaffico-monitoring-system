@@ -21,7 +21,7 @@ Set-Location $scriptPath
 
 Write-Host "Step 1: Setting up startup tasks (PHP-CGI and Nginx)..." -ForegroundColor Yellow
 & "$scriptPath\setup-startup-task.ps1"
-if ($LASTEXITCODE -ne 0) {
+if (-not $?) {
     Write-Host "ERROR: Failed to setup startup tasks" -ForegroundColor Red
     exit 1
 }
@@ -29,7 +29,7 @@ Write-Host ""
 
 Write-Host "Step 2: Setting up monitoring scheduler task..." -ForegroundColor Yellow
 & "$scriptPath\setup-task-scheduler.ps1"
-if ($LASTEXITCODE -ne 0) {
+if (-not $?) {
     Write-Host "ERROR: Failed to setup scheduler task" -ForegroundColor Red
     exit 1
 }
@@ -37,7 +37,7 @@ Write-Host ""
 
 Write-Host "Step 3: Setting up watchdog task..." -ForegroundColor Yellow
 & "$scriptPath\setup-watchdog-task.ps1"
-if ($LASTEXITCODE -ne 0) {
+if (-not $?) {
     Write-Host "ERROR: Failed to setup watchdog task" -ForegroundColor Red
     exit 1
 }

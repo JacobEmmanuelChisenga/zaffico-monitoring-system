@@ -8,8 +8,9 @@
 
 $ErrorActionPreference = "Stop"
 
-$basePath = "C:\Users\chisengaj\Desktop\LaravelProjects\zaffico-monitoring-system"
-$watchdogScript = "$basePath\scripts\watchdog.ps1"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$basePath = Split-Path -Parent $scriptDir
+$watchdogScript = Join-Path $scriptDir "watchdog.ps1"
 $taskName = "ZAFFICO - Process Watchdog"
 
 Write-Host "Setting up ZAFFICO Monitoring Watchdog Task..." -ForegroundColor Cyan

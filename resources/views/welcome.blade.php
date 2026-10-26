@@ -915,7 +915,7 @@
                                 response_time: a.response_time
                             })));
                         }
-                        updatePageData(data.data);
+                        updatePageData(data.data, data.timestamp);
 
                         // Update chart if chart data is included
                         if (includeCharts && data.data.chartData) {
@@ -1085,7 +1085,7 @@
         /**
          * Update page data without refresh
          */
-        function updatePageData(data) {
+        function updatePageData(data, serverNowIso) {
             // Update stats cards
             updateElement('totalApplications', data.totalApplications);
             updateElement('applicationsUp', data.applicationsUp);
@@ -1124,7 +1124,7 @@
 
             // Update application statuses
             if (data.applications && Array.isArray(data.applications)) {
-                updateApplicationStatuses(data.applications);
+                updateApplicationStatuses(data.applications, serverNowIso);
 
                 // Show stale indicators
                 data.applications.forEach(app => {
@@ -1191,7 +1191,7 @@
         /**
          * Update application statuses in the list
          */
-        function updateApplicationStatuses(applications) {
+        function updateApplicationStatuses(applications, serverNowIso) {
             applications.forEach(app => {
                 // Debug: Log each app's status
                 console.log(`Updating ${app.name}: status=${app.status}, response_time=${app.response_time}`);
@@ -1239,7 +1239,7 @@
                     if (lastCheckedEl) {
                         if (app.last_checked_at) {
                             const date = new Date(app.last_checked_at);
-                            const now = new Date();
+                            const now = serverNowIso ? new Date(serverNowIso) : new Date();
                             const diffMs = now - date;
                             const diffMins = Math.floor(diffMs / 60000);
                             const diffHours = Math.floor(diffMs / 3600000);

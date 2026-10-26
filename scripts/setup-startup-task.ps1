@@ -1,8 +1,12 @@
 Write-Host "Setting up ZAFFICO Monitoring startup tasks..." -ForegroundColor Cyan
 
-$basePath = "C:\Users\chisengaj\Desktop\LaravelProjects\zaffico-monitoring-system\scripts"
-$phpBat   = "$basePath\start-php-cgi.bat"
-$nginxBat = "$basePath\start-nginx.bat"
+# Use the folder this script is in, so the server and this PC both work.
+$basePath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$phpBat   = Join-Path $basePath "start-php-cgi.bat"
+$nginxBat = Join-Path $basePath "start-nginx.bat"
+
+if (-not (Test-Path $phpBat)) { throw "start-php-cgi.bat not found at $phpBat" }
+if (-not (Test-Path $nginxBat)) { throw "start-nginx.bat not found at $nginxBat" }
 
 # Settings: No execution time limit, allow restart on failure
 $settings = New-ScheduledTaskSettingsSet `
@@ -54,3 +58,5 @@ Register-ScheduledTask `
 Write-Host "Nginx startup task created." -ForegroundColor Green
 
 Write-Host "ZAFFICO Monitoring System will start automatically at boot." -ForegroundColor Cyan
+Write-Host "Scripts: $basePath" -ForegroundColor Cyan
+exit 0
